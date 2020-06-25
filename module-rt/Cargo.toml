@@ -1,0 +1,9 @@
+[package]
+name = "foundry-module-rt"
+version = "0.1.0"
+authors = ["CodeChain Team <hi@codechain.io>"]
+edition = "2018"
+
+[dependencies]
+remote-trait-object = { git = "https://github.com/CodeChain-io/remote-trait-object.git" }
+codechain-basesandbox = { git = "https://github.com/CodeChain-io/foundry-sandbox.git"}
