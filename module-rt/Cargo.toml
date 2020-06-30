@@ -5,5 +5,11 @@ authors = ["CodeChain Team <hi@codechain.io>"]
 edition = "2018"
 
 [dependencies]
-remote-trait-object = { git = "https://github.com/CodeChain-io/remote-trait-object.git" }
-codechain-basesandbox = { git = "https://github.com/CodeChain-io/foundry-sandbox.git"}
+remote-trait-object = { version = "0.1.1", git = "https://github.com/CodeChain-io/remote-trait-object.git" }
+remote-trait-object-macro = { version = "0.1.1", git = "https://github.com/CodeChain-io/remote-trait-object.git" }
+foundry-process-sandbox = { git = "https://github.com/CodeChain-io/foundry-sandbox.git"}
+parking_lot = "0.11.0"
+serde = { version = "1.0", features = ["derive"] }
+serde_cbor = "0.11.1"
+linkme = "0.2.1"
+crossbeam = "0.7"
