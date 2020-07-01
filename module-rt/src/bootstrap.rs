@@ -27,7 +27,7 @@ struct ModuleContext {
 impl Service for ModuleContext {}
 
 impl FoundryModule for ModuleContext {
-    fn initialize(&self, _arg: &[u8], _exports: &[(String, Vec<u8>)]) {
+    fn initialize(&mut self, _arg: &[u8], _exports: &[(String, Vec<u8>)]) {
         unimplemented!()
     }
 
@@ -35,7 +35,7 @@ impl FoundryModule for ModuleContext {
         unimplemented!()
     }
 
-    fn debug(&self, _arg: &[u8]) -> Vec<u8> {
+    fn debug(&mut self, _arg: &[u8]) -> Vec<u8> {
         unimplemented!()
     }
 
