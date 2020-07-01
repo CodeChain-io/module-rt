@@ -39,7 +39,7 @@ pub trait FoundryModule: Service {
 
 /// A service trait that represents a port to be bootstrapped.
 ///
-/// 'Bootstrapping' a port means exchange(export/import) required services for the port.
+/// 'Bootstrapping' a port means exchanging(export/import) required services for the port.
 ///
 /// Having [`HandleToExchange`] in methods of service trait is a really uncommon situation.
 /// In most case where you want to export/import service objects, you will just use [`SBox`], [`SArc`], or [`SRwLock`].
