@@ -31,9 +31,9 @@ use remote_trait_object_macro::service;
 /// A service trait that represents a module that the Foundry host will communicate through.
 #[service]
 pub trait FoundryModule: Service {
-    fn initialize(&self, arg: &[u8], exports: &[(String, Vec<u8>)]);
+    fn initialize(&mut self, arg: &[u8], exports: &[(String, Vec<u8>)]);
     fn create_port(&mut self, name: &str, ipc_arc: Vec<u8>, intra: bool) -> SBox<dyn Port>;
-    fn debug(&self, arg: &[u8]) -> Vec<u8>;
+    fn debug(&mut self, arg: &[u8]) -> Vec<u8>;
     fn shutdown(&mut self);
 }
 
