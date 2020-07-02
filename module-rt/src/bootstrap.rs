@@ -62,8 +62,8 @@ impl<T: UserModule> FoundryModule for ModuleContext<T> {
         unimplemented!()
     }
 
-    fn debug(&mut self, _arg: &[u8]) -> Vec<u8> {
-        unimplemented!()
+    fn debug(&mut self, arg: &[u8]) -> Vec<u8> {
+        self.user_context.as_ref().unwrap().lock().debug(arg)
     }
 
     fn shutdown(&mut self) {
