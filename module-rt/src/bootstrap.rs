@@ -58,7 +58,7 @@ impl<T: UserModule> FoundryModule for ModuleContext<T> {
         self.user_context.replace(Arc::new(Mutex::new(module)));
     }
 
-    fn create_port(&mut self, _name: &str, _ipc_arc: Vec<u8>, _intra: bool) -> SBox<dyn Port> {
+    fn create_port(&mut self, _name: &str, _ipc_arg: Vec<u8>, _intra: bool) -> SBox<dyn Port> {
         unimplemented!()
     }
 

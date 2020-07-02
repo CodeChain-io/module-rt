@@ -32,7 +32,7 @@ use remote_trait_object_macro::service;
 #[service]
 pub trait FoundryModule: Service {
     fn initialize(&mut self, arg: &[u8], exports: &[(String, Vec<u8>)]);
-    fn create_port(&mut self, name: &str, ipc_arc: Vec<u8>, intra: bool) -> SBox<dyn Port>;
+    fn create_port(&mut self, name: &str, ipc_arg: Vec<u8>, intra: bool) -> SBox<dyn Port>;
     fn debug(&mut self, arg: &[u8]) -> Vec<u8>;
     fn shutdown(&mut self);
 }
