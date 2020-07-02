@@ -68,7 +68,6 @@ impl<T: UserModule> FoundryModule for ModuleContext<T> {
 
     fn shutdown(&mut self) {
         self.shutdown_signal.send(()).unwrap();
-        unimplemented!()
     }
 }
 
