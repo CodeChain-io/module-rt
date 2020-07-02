@@ -24,7 +24,7 @@ use std::sync::Arc;
 /// generic parameter, and the `start` will automatically initiate a module with it.
 ///
 /// [`start`]: ../fn.start.html
-pub trait UserModule {
+pub trait UserModule: Send {
     fn new(arg: &[u8]) -> Self;
     fn prepare_service_to_export(&mut self, ctor_name: &str, ctor_arg: &[u8]) -> Arc<dyn Dispatch>;
     fn import_service(&mut self, rto_context: &RtoContext, exporter_module: &str, name: &str, handle: HandleToExchange);
