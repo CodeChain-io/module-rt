@@ -18,17 +18,44 @@ use crate::coordinator_interface::{FoundryModule, Port};
 use crate::module::UserModule;
 use crossbeam::channel;
 use fproc_sndbx::ipc::Ipc;
-use remote_trait_object::{SBox, Service};
+use parking_lot::Mutex;
+use remote_trait_object::{Dispatch, SBox, Service};
+use std::sync::Arc;
 
-struct ModuleContext {
+pub struct ExportingServicePool {
+    pool: Vec<Option<Arc<dyn Dispatch>>>,
+}
+
+impl ExportingServicePool {
+    pub fn new() -> Self {
+        Self {
+            pool: Vec::new(),
+        }
+    }
+
+    pub fn load(&mut self, ctors: &[(String, Vec<u8>)], module: &mut impl UserModule) {
+        self.pool = ctors.iter().map(|(method, arg)| Some(module.prepare_service_to_export(method, arg))).collect();
+    }
+
+    pub fn export(&mut self, index: usize) -> Arc<dyn Dispatch> {
+        self.pool[index].take().unwrap()
+    }
+}
+
+struct ModuleContext<T: UserModule> {
+    user_context: Option<Arc<Mutex<T>>>,
+    exporting_service_pool: Arc<Mutex<ExportingServicePool>>,
     shutdown_signal: channel::Sender<()>,
 }
 
-impl Service for ModuleContext {}
+impl<T: UserModule> Service for ModuleContext<T> {}
 
-impl FoundryModule for ModuleContext {
-    fn initialize(&mut self, _arg: &[u8], _exports: &[(String, Vec<u8>)]) {
-        unimplemented!()
+impl<T: UserModule> FoundryModule for ModuleContext<T> {
+    fn initialize(&mut self, arg: &[u8], exports: &[(String, Vec<u8>)]) {
+        assert!(self.user_context.is_none(), "Moudle has been initialized twice");
+        let mut module = T::new(arg);
+        self.exporting_service_pool.lock().load(&exports, &mut module);
+        self.user_context.replace(Arc::new(Mutex::new(module)));
     }
 
     fn create_port(&mut self, _name: &str, _ipc_arc: Vec<u8>, _intra: bool) -> SBox<dyn Port> {
@@ -51,10 +78,12 @@ impl FoundryModule for ModuleContext {
 /// or thread arguments in case of module-as-a-thread.
 ///
 /// This function will not return until Foundry host is shutdown.
-pub fn start<I: Ipc + 'static, T: UserModule>(args: Vec<String>) {
+pub fn start<I: Ipc + 'static, T: UserModule + 'static>(args: Vec<String>) {
     let (shutdown_signal, shutdown_wait) = channel::bounded(0);
     let executee = fproc_sndbx::execution::executee::start::<I>(args);
-    let module = Box::new(ModuleContext {
+    let module = Box::new(ModuleContext::<T> {
+        user_context: None,
+        exporting_service_pool: Arc::new(Mutex::new(ExportingServicePool::new())),
         shutdown_signal,
     }) as Box<dyn FoundryModule>;
     let (_ctx, _coordinator) = fproc_sndbx::execution::with_rto::setup_executee(executee, module).unwrap();
