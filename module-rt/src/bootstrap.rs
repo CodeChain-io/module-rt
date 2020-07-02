@@ -16,6 +16,7 @@
 
 use crate::coordinator_interface::{FoundryModule, Port};
 use crate::module::UserModule;
+use crate::port::ModulePort;
 use crossbeam::channel;
 use fproc_sndbx::ipc::Ipc;
 use parking_lot::Mutex;
@@ -50,7 +51,7 @@ struct ModuleContext<T: UserModule> {
 
 impl<T: UserModule> Service for ModuleContext<T> {}
 
-impl<T: UserModule> FoundryModule for ModuleContext<T> {
+impl<T: UserModule + 'static> FoundryModule for ModuleContext<T> {
     fn initialize(&mut self, arg: &[u8], exports: &[(String, Vec<u8>)]) {
         assert!(self.user_context.is_none(), "Moudle has been initialized twice");
         let mut module = T::new(arg);
@@ -58,8 +59,14 @@ impl<T: UserModule> FoundryModule for ModuleContext<T> {
         self.user_context.replace(Arc::new(Mutex::new(module)));
     }
 
-    fn create_port(&mut self, _name: &str, _ipc_arg: Vec<u8>, _intra: bool) -> SBox<dyn Port> {
-        unimplemented!()
+    fn create_port(&mut self, name: &str, ipc_arg: Vec<u8>, intra: bool) -> SBox<dyn Port> {
+        SBox::new(Box::new(ModulePort::new(
+            name.to_string(),
+            ipc_arg,
+            intra,
+            Arc::clone(self.user_context.as_ref().unwrap()),
+            Arc::clone(&self.exporting_service_pool),
+        )) as Box<dyn Port>)
     }
 
     fn debug(&mut self, arg: &[u8]) -> Vec<u8> {

@@ -19,6 +19,7 @@ extern crate foundry_process_sandbox as fproc_sndbx;
 mod bootstrap;
 pub mod coordinator_interface;
 mod module;
+mod port;
 
 pub use bootstrap::start;
 pub use module::UserModule;
