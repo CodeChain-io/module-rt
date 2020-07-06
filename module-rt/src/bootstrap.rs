@@ -14,13 +14,14 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use crate::coordinator_interface::{FoundryModule, Port};
+use crate::coordinator_interface::Port;
 use crate::module::UserModule;
 use crate::port::ModulePort;
 use crossbeam::channel;
 use fproc_sndbx::ipc::Ipc;
-use parking_lot::Mutex;
-use remote_trait_object::{Dispatch, SBox, Service};
+use parking_lot::{Mutex, RwLock};
+use remote_trait_object::{Dispatch, SRwLock, Service};
+use std::collections::HashMap;
 use std::sync::Arc;
 
 pub struct ExportingServicePool {
@@ -43,15 +44,26 @@ impl ExportingServicePool {
     }
 }
 
+/// This service trait is compatible with FoundryModule, but slightly changed
+/// to share the Port
+#[remote_trait_object_macro::service]
+trait FoundryModuleInternal: Service {
+    fn initialize(&mut self, arg: &[u8], exports: &[(String, Vec<u8>)]);
+    fn create_port(&mut self, name: &str) -> SRwLock<dyn Port>;
+    fn debug(&mut self, arg: &[u8]) -> Vec<u8>;
+    fn shutdown(&mut self);
+}
+
 struct ModuleContext<T: UserModule> {
     user_context: Option<Arc<Mutex<T>>>,
     exporting_service_pool: Arc<Mutex<ExportingServicePool>>,
+    ports: HashMap<String, Arc<RwLock<ModulePort<T>>>>,
     shutdown_signal: channel::Sender<()>,
 }
 
 impl<T: UserModule> Service for ModuleContext<T> {}
 
-impl<T: UserModule + 'static> FoundryModule for ModuleContext<T> {
+impl<T: UserModule + 'static> FoundryModuleInternal for ModuleContext<T> {
     fn initialize(&mut self, arg: &[u8], exports: &[(String, Vec<u8>)]) {
         assert!(self.user_context.is_none(), "Moudle has been initialized twice");
         let mut module = T::new(arg);
@@ -59,12 +71,15 @@ impl<T: UserModule + 'static> FoundryModule for ModuleContext<T> {
         self.user_context.replace(Arc::new(Mutex::new(module)));
     }
 
-    fn create_port(&mut self, name: &str) -> SBox<dyn Port> {
-        SBox::new(Box::new(ModulePort::new(
+    fn create_port(&mut self, name: &str) -> SRwLock<dyn Port> {
+        let port = Arc::new(RwLock::new(ModulePort::new(
             name.to_string(),
-            Arc::clone(self.user_context.as_ref().unwrap()),
+            Arc::downgrade(self.user_context.as_ref().unwrap()),
             Arc::clone(&self.exporting_service_pool),
-        )) as Box<dyn Port>)
+        )));
+        let port_ = Arc::clone(&port);
+        self.ports.insert(name.to_owned(), port);
+        SRwLock::new(port_ as Arc<RwLock<dyn Port>>)
     }
 
     fn debug(&mut self, arg: &[u8]) -> Vec<u8> {
@@ -72,6 +87,10 @@ impl<T: UserModule + 'static> FoundryModule for ModuleContext<T> {
     }
 
     fn shutdown(&mut self) {
+        for port in self.ports.values() {
+            port.read().shutdown();
+        }
+        self.user_context.take().unwrap();
         self.shutdown_signal.send(()).unwrap();
     }
 }
@@ -88,8 +107,9 @@ pub fn start<I: Ipc + 'static, T: UserModule + 'static>(args: Vec<String>) {
     let module = Box::new(ModuleContext::<T> {
         user_context: None,
         exporting_service_pool: Arc::new(Mutex::new(ExportingServicePool::new())),
+        ports: HashMap::new(),
         shutdown_signal,
-    }) as Box<dyn FoundryModule>;
+    }) as Box<dyn FoundryModuleInternal>;
     let (ctx, _coordinator) = fproc_sndbx::execution::with_rto::setup_executee(executee, module).unwrap();
     shutdown_wait.recv().unwrap();
     ctx.disable_garbage_collection();
