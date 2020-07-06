@@ -20,19 +20,19 @@ use crate::module::UserModule;
 use fproc_sndbx::ipc::{intra::Intra, unix_socket::DomainSocket, Ipc};
 use parking_lot::Mutex;
 use remote_trait_object::{Context as RtoContext, HandleToExchange, Service};
-use std::sync::Arc;
+use std::sync::{Arc, Weak};
 
 pub struct ModulePort<T: UserModule> {
     connected_module_name: String,
     rto_context: Option<RtoContext>,
-    user_context: Arc<Mutex<T>>,
+    user_context: Weak<Mutex<T>>,
     exporting_service_pool: Arc<Mutex<ExportingServicePool>>,
 }
 
 impl<T: UserModule> ModulePort<T> {
     pub fn new(
         connected_module_name: String,
-        user_context: Arc<Mutex<T>>,
+        user_context: Weak<Mutex<T>>,
         exporting_service_pool: Arc<Mutex<ExportingServicePool>>,
     ) -> Self {
         Self {
@@ -41,6 +41,10 @@ impl<T: UserModule> ModulePort<T> {
             user_context,
             exporting_service_pool,
         }
+    }
+
+    pub fn shutdown(&self) {
+        self.rto_context.as_ref().unwrap().disable_garbage_collection();
     }
 }
 
@@ -66,7 +70,7 @@ impl<T: UserModule> Port for ModulePort<T> {
 
     fn import(&mut self, slots: &[(String, HandleToExchange)]) {
         for (name, handle) in slots {
-            self.user_context.lock().import_service(
+            self.user_context.upgrade().unwrap().lock().import_service(
                 self.rto_context.as_ref().unwrap(),
                 &self.connected_module_name,
                 name,
