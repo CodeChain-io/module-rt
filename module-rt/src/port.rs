@@ -24,7 +24,7 @@ use std::sync::Arc;
 
 pub struct ModulePort<T: UserModule> {
     connected_module_name: String,
-    rto_context: RtoContext,
+    rto_context: Option<RtoContext>,
     user_context: Arc<Mutex<T>>,
     exporting_service_pool: Arc<Mutex<ExportingServicePool>>,
 }
@@ -32,21 +32,12 @@ pub struct ModulePort<T: UserModule> {
 impl<T: UserModule> ModulePort<T> {
     pub fn new(
         connected_module_name: String,
-        ipc_arg: Vec<u8>,
-        intra: bool,
         user_context: Arc<Mutex<T>>,
         exporting_service_pool: Arc<Mutex<ExportingServicePool>>,
     ) -> Self {
-        let rto_context = if intra {
-            let (ipc_send, ipc_recv) = Intra::new(ipc_arg).split();
-            RtoContext::new(ipc_send, ipc_recv)
-        } else {
-            let (ipc_send, ipc_recv) = DomainSocket::new(ipc_arg).split();
-            RtoContext::new(ipc_send, ipc_recv)
-        };
         Self {
             connected_module_name,
-            rto_context,
+            rto_context: None,
             user_context,
             exporting_service_pool,
         }
@@ -56,14 +47,31 @@ impl<T: UserModule> ModulePort<T> {
 impl<T: UserModule> Service for ModulePort<T> {}
 
 impl<T: UserModule> Port for ModulePort<T> {
+    fn initialize(&mut self, ipc_arg: Vec<u8>, intra: bool) {
+        assert!(self.rto_context.is_none(), "Port must be initialized only once");
+        let rto_context = if intra {
+            let (ipc_send, ipc_recv) = Intra::new(ipc_arg).split();
+            RtoContext::new(ipc_send, ipc_recv)
+        } else {
+            let (ipc_send, ipc_recv) = DomainSocket::new(ipc_arg).split();
+            RtoContext::new(ipc_send, ipc_recv)
+        };
+        self.rto_context.replace(rto_context);
+    }
+
     fn export(&mut self, ids: &[usize]) -> Vec<HandleToExchange> {
-        let port = self.rto_context.get_port().upgrade().unwrap();
+        let port = self.rto_context.as_ref().unwrap().get_port().upgrade().unwrap();
         ids.iter().map(|&id| port.register(self.exporting_service_pool.lock().export(id))).collect()
     }
 
     fn import(&mut self, slots: &[(String, HandleToExchange)]) {
         for (name, handle) in slots {
-            self.user_context.lock().import_service(&self.rto_context, &self.connected_module_name, name, *handle)
+            self.user_context.lock().import_service(
+                self.rto_context.as_ref().unwrap(),
+                &self.connected_module_name,
+                name,
+                *handle,
+            )
         }
     }
 }
