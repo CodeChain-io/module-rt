@@ -59,11 +59,9 @@ impl<T: UserModule + 'static> FoundryModule for ModuleContext<T> {
         self.user_context.replace(Arc::new(Mutex::new(module)));
     }
 
-    fn create_port(&mut self, name: &str, ipc_arg: Vec<u8>, intra: bool) -> SBox<dyn Port> {
+    fn create_port(&mut self, name: &str) -> SBox<dyn Port> {
         SBox::new(Box::new(ModulePort::new(
             name.to_string(),
-            ipc_arg,
-            intra,
             Arc::clone(self.user_context.as_ref().unwrap()),
             Arc::clone(&self.exporting_service_pool),
         )) as Box<dyn Port>)
@@ -92,6 +90,7 @@ pub fn start<I: Ipc + 'static, T: UserModule + 'static>(args: Vec<String>) {
         exporting_service_pool: Arc::new(Mutex::new(ExportingServicePool::new())),
         shutdown_signal,
     }) as Box<dyn FoundryModule>;
-    let (_ctx, _coordinator) = fproc_sndbx::execution::with_rto::setup_executee(executee, module).unwrap();
+    let (ctx, _coordinator) = fproc_sndbx::execution::with_rto::setup_executee(executee, module).unwrap();
     shutdown_wait.recv().unwrap();
+    ctx.disable_garbage_collection();
 }
