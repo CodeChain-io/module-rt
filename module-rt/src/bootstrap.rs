@@ -20,7 +20,7 @@ use crate::port::ModulePort;
 use crossbeam::channel;
 use fproc_sndbx::ipc::Ipc;
 use parking_lot::{Mutex, RwLock};
-use remote_trait_object::{Dispatch, SRwLock, Service};
+use remote_trait_object::{Dispatch, Service, ServiceRef};
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -49,7 +49,7 @@ impl ExportingServicePool {
 #[remote_trait_object_macro::service]
 trait FoundryModuleInternal: Service {
     fn initialize(&mut self, arg: &[u8], exports: &[(String, Vec<u8>)]);
-    fn create_port(&mut self, name: &str) -> SRwLock<dyn Port>;
+    fn create_port(&mut self, name: &str) -> ServiceRef<dyn Port>;
     fn debug(&mut self, arg: &[u8]) -> Vec<u8>;
     fn shutdown(&mut self);
 }
@@ -71,7 +71,7 @@ impl<T: UserModule + 'static> FoundryModuleInternal for ModuleContext<T> {
         self.user_context.replace(Arc::new(Mutex::new(module)));
     }
 
-    fn create_port(&mut self, name: &str) -> SRwLock<dyn Port> {
+    fn create_port(&mut self, name: &str) -> ServiceRef<dyn Port> {
         let port = Arc::new(RwLock::new(ModulePort::new(
             name.to_string(),
             Arc::downgrade(self.user_context.as_ref().unwrap()),
@@ -79,7 +79,7 @@ impl<T: UserModule + 'static> FoundryModuleInternal for ModuleContext<T> {
         )));
         let port_ = Arc::clone(&port);
         self.ports.insert(name.to_owned(), port);
-        SRwLock::new(port_ as Arc<RwLock<dyn Port>>)
+        ServiceRef::export(port_ as Arc<RwLock<dyn Port>>)
     }
 
     fn debug(&mut self, arg: &[u8]) -> Vec<u8> {
