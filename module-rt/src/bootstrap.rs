@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use crate::coordinator_interface::Port;
+use crate::coordinator_interface::{FoundryModule, Port};
 use crate::module::UserModule;
 use crate::port::ModulePort;
 use crossbeam::channel;
@@ -44,16 +44,6 @@ impl ExportingServicePool {
     }
 }
 
-/// This service trait is compatible with FoundryModule, but slightly changed
-/// to share the Port
-#[remote_trait_object_macro::service]
-trait FoundryModuleInternal: Service {
-    fn initialize(&mut self, arg: &[u8], exports: &[(String, Vec<u8>)]);
-    fn create_port(&mut self, name: &str) -> ServiceRef<dyn Port>;
-    fn debug(&mut self, arg: &[u8]) -> Vec<u8>;
-    fn shutdown(&mut self);
-}
-
 struct ModuleContext<T: UserModule> {
     user_context: Option<Arc<Mutex<T>>>,
     exporting_service_pool: Arc<Mutex<ExportingServicePool>>,
@@ -63,7 +53,7 @@ struct ModuleContext<T: UserModule> {
 
 impl<T: UserModule> Service for ModuleContext<T> {}
 
-impl<T: UserModule + 'static> FoundryModuleInternal for ModuleContext<T> {
+impl<T: UserModule + 'static> FoundryModule for ModuleContext<T> {
     fn initialize(&mut self, arg: &[u8], exports: &[(String, Vec<u8>)]) {
         assert!(self.user_context.is_none(), "Moudle has been initialized twice");
         let mut module = T::new(arg);
@@ -109,7 +99,7 @@ pub fn start<I: Ipc + 'static, T: UserModule + 'static>(args: Vec<String>) {
         exporting_service_pool: Arc::new(Mutex::new(ExportingServicePool::new())),
         ports: HashMap::new(),
         shutdown_signal,
-    }) as Box<dyn FoundryModuleInternal>;
+    }) as Box<dyn FoundryModule>;
     let (ctx, _coordinator) = fproc_sndbx::execution::with_rto::setup_executee(executee, module).unwrap();
     shutdown_wait.recv().unwrap();
     ctx.disable_garbage_collection();
