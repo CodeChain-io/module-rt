@@ -17,6 +17,7 @@
 extern crate foundry_module_rt as fmoudle_rt;
 extern crate foundry_process_sandbox as fproc_sndbx;
 
+use fmoudle_rt::coordinator_interface::Port;
 use fmoudle_rt::UserModule;
 use fproc_sndbx::execution::executor::{add_function_pool, execute, Context as ExecutorContext, PlainThread};
 use fproc_sndbx::execution::with_rto;
@@ -139,8 +140,8 @@ pub fn test1() {
     let (_process2, rto_context2, mut module2) =
         create_module(executor_2, n, &serde_cbor::to_vec(&("Konnichiwa", "Annyeong")).unwrap());
 
-    let mut port1 = module1.create_port("").unwrap();
-    let mut port2 = module2.create_port("").unwrap();
+    let mut port1: Box<dyn Port> = module1.create_port("").import();
+    let mut port2: Box<dyn Port> = module2.create_port("").import();
 
     let (ipc_arg1, ipc_arg2) = Intra::arguments_for_both_ends();
 
