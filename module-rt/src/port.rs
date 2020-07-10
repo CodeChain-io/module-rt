@@ -43,8 +43,10 @@ impl<T: UserModule> ModulePort<T> {
         }
     }
 
-    pub fn shutdown(&self) {
+    pub fn shutdown(&mut self) {
         self.rto_context.as_ref().unwrap().disable_garbage_collection();
+        // This is important; we have to drop all service while all ports in this module are still alive.
+        self.rto_context.as_mut().unwrap().clear_service_registry();
     }
 }
 
