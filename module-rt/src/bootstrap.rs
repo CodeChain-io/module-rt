@@ -77,7 +77,7 @@ impl<T: UserModule + 'static> FoundryModule for ModuleContext<T> {
             Arc::clone(&self.exporting_service_pool),
         )));
         let port_ = Arc::clone(&port);
-        self.ports.insert(name.to_owned(), port);
+        assert!(self.ports.insert(name.to_owned(), port).is_none());
         ServiceRef::export(port_ as Arc<RwLock<dyn Port>>)
     }
 
