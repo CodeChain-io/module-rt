@@ -42,6 +42,15 @@ impl ExportingServicePool {
     pub fn export(&mut self, index: usize) -> Arc<dyn Dispatch> {
         self.pool[index].take().unwrap()
     }
+
+    pub fn is_empty(&self) -> bool {
+        for p in &self.pool {
+            if p.is_some() {
+                return false
+            }
+        }
+        true
+    }
 }
 
 struct ModuleContext<T: UserModule> {
@@ -77,6 +86,7 @@ impl<T: UserModule + 'static> FoundryModule for ModuleContext<T> {
     }
 
     fn shutdown(&mut self) {
+        assert!(self.exporting_service_pool.lock().is_empty());
         for port in self.ports.values() {
             port.read().shutdown();
         }
