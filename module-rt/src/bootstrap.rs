@@ -88,9 +88,10 @@ impl<T: UserModule + 'static> FoundryModule for ModuleContext<T> {
     fn shutdown(&mut self) {
         assert!(self.exporting_service_pool.lock().is_empty());
         for port in self.ports.values() {
-            port.read().shutdown();
+            port.write().shutdown();
         }
         self.user_context.take().unwrap();
+        self.ports.clear();
         self.shutdown_signal.send(()).unwrap();
     }
 }
