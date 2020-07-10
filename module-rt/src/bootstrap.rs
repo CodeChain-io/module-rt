@@ -111,7 +111,6 @@ pub fn start<I: Ipc + 'static, T: UserModule + 'static>(args: Vec<String>) {
         ports: HashMap::new(),
         shutdown_signal,
     }) as Box<dyn FoundryModule>;
-    let (ctx, _coordinator) = fproc_sndbx::execution::with_rto::setup_executee(executee, module).unwrap();
+    let (_ctx, _coordinator) = fproc_sndbx::execution::with_rto::setup_executee(executee, module).unwrap();
     shutdown_wait.recv().unwrap();
-    ctx.disable_garbage_collection();
 }
