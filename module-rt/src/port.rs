@@ -19,7 +19,7 @@ use crate::coordinator_interface::Port;
 use crate::module::UserModule;
 use fproc_sndbx::ipc::{intra::Intra, unix_socket::DomainSocket, Ipc};
 use parking_lot::Mutex;
-use remote_trait_object::{Context as RtoContext, HandleToExchange, Service};
+use remote_trait_object::{Config as RtoConfig, Context as RtoContext, HandleToExchange, Service};
 use std::sync::{Arc, Weak};
 
 pub struct ModulePort<T: UserModule> {
@@ -53,14 +53,14 @@ impl<T: UserModule> ModulePort<T> {
 impl<T: UserModule> Service for ModulePort<T> {}
 
 impl<T: UserModule> Port for ModulePort<T> {
-    fn initialize(&mut self, ipc_arg: Vec<u8>, intra: bool) {
+    fn initialize(&mut self, rto_config: RtoConfig, ipc_arg: Vec<u8>, intra: bool) {
         assert!(self.rto_context.is_none(), "Port must be initialized only once");
         let rto_context = if intra {
             let (ipc_send, ipc_recv) = Intra::new(ipc_arg).split();
-            RtoContext::new(ipc_send, ipc_recv)
+            RtoContext::new(rto_config, ipc_send, ipc_recv)
         } else {
             let (ipc_send, ipc_recv) = DomainSocket::new(ipc_arg).split();
-            RtoContext::new(ipc_send, ipc_recv)
+            RtoContext::new(rto_config, ipc_send, ipc_recv)
         };
         self.rto_context.replace(rto_context);
     }

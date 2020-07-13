@@ -26,7 +26,6 @@
 //! [`Port`]: ./trait.Port.html
 
 use remote_trait_object::*;
-use remote_trait_object_macro::service;
 
 /// A service trait that represents a module that the Foundry host will communicate through.
 #[service]
@@ -47,7 +46,7 @@ pub trait FoundryModule: Service {
 /// for the importer to cast it as he wants, we have this special interface.
 #[service]
 pub trait Port: Service {
-    fn initialize(&mut self, ipc_arg: Vec<u8>, intra: bool);
+    fn initialize(&mut self, rto_config: Config, ipc_arg: Vec<u8>, intra: bool);
     fn export(&mut self, ids: &[usize]) -> Vec<HandleToExchange>;
     fn import(&mut self, slots: &[(String, HandleToExchange)]);
 }
