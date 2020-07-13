@@ -20,6 +20,7 @@ use crate::port::ModulePort;
 use crossbeam::channel;
 use fproc_sndbx::ipc::Ipc;
 use parking_lot::{Mutex, RwLock};
+use remote_trait_object::Config as RtoConfig;
 use remote_trait_object::{Dispatch, Service, ServiceRef};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -104,13 +105,19 @@ impl<T: UserModule + 'static> FoundryModule for ModuleContext<T> {
 /// This function will not return until Foundry host is shutdown.
 pub fn start<I: Ipc + 'static, T: UserModule + 'static>(args: Vec<String>) {
     let (shutdown_signal, shutdown_wait) = channel::bounded(0);
-    let executee = fproc_sndbx::execution::executee::start::<I>(args);
+    let mut executee = fproc_sndbx::execution::executee::start::<I>(args);
     let module = Box::new(ModuleContext::<T> {
         user_context: None,
         exporting_service_pool: Arc::new(Mutex::new(ExportingServicePool::new())),
         ports: HashMap::new(),
         shutdown_signal,
     }) as Box<dyn FoundryModule>;
-    let (_ctx, _coordinator) = fproc_sndbx::execution::with_rto::setup_executee(executee, module).unwrap();
+
+    // rto configuration of the module itself (not each port) is not that important;
+    // no need to take it from the coordinator
+    let config = RtoConfig::default_setup();
+    let (transport_send, transport_recv) = executee.ipc.take().unwrap().split();
+    let (_ctx, _): (_, Box<dyn remote_trait_object::NullService>) =
+        remote_trait_object::Context::with_initial_service(config, transport_send, transport_recv, module);
     shutdown_wait.recv().unwrap();
 }

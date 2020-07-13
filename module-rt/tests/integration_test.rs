@@ -20,12 +20,13 @@ extern crate foundry_process_sandbox as fproc_sndbx;
 use fmoudle_rt::coordinator_interface::Port;
 use fmoudle_rt::UserModule;
 use fproc_sndbx::execution::executor::{add_function_pool, execute, Context as ExecutorContext, PlainThread};
-use fproc_sndbx::execution::with_rto;
 use fproc_sndbx::ipc::{generate_random_name, intra::Intra, Ipc};
-use remote_trait_object::{Context as RtoContext, Dispatch, HandleToExchange, Service, ToDispatcher};
+use remote_trait_object::{
+    service, Config as RtoConfig, Context as RtoContext, Dispatch, HandleToExchange, Service, ToDispatcher,
+};
 use std::sync::Arc;
 
-#[remote_trait_object_macro::service]
+#[service]
 trait Hello: Service {
     fn hello(&self) -> i32;
     fn hi(&self) -> String;
@@ -92,7 +93,7 @@ impl UserModule for ModuleA {
     }
 }
 
-#[remote_trait_object_macro::service]
+#[service]
 pub trait SandboxForModule: remote_trait_object::Service {
     fn ping(&self);
 }
@@ -108,19 +109,25 @@ fn execute_module<M: UserModule + 'static>(args: Vec<String>) {
 }
 
 fn create_module(
-    ctx: ExecutorContext<Intra, PlainThread>,
+    mut ctx: ExecutorContext<Intra, PlainThread>,
     n: usize,
     init: &[u8],
 ) -> (ExecutorContext<Intra, PlainThread>, RtoContext, Box<dyn fmoudle_rt::coordinator_interface::FoundryModule>) {
     let exports: Vec<(String, Vec<u8>)> =
         (0..n).map(|i| ("Constructor".to_owned(), serde_cbor::to_vec(&i).unwrap())).collect();
 
-    let (executor_ctx, rto_context, handle) =
-        with_rto::setup_executor(ctx, Box::new(DummyPong) as Box<dyn SandboxForModule>).unwrap();
-    let mut module: Box<dyn fmoudle_rt::coordinator_interface::FoundryModule> =
-        remote_trait_object::import_service(&rto_context, handle);
+    let (transport_send, transport_recv) = ctx.ipc.take().unwrap().split();
+    let config = RtoConfig::default_setup();
+    let (rto_context, mut module): (_, Box<dyn fmoudle_rt::coordinator_interface::FoundryModule>) =
+        remote_trait_object::Context::with_initial_service(
+            config,
+            transport_send,
+            transport_recv,
+            remote_trait_object::create_null_service(),
+        );
+
     module.initialize(init, &exports);
-    (executor_ctx, rto_context, module)
+    (ctx, rto_context, module)
 }
 
 #[test]
@@ -146,10 +153,10 @@ pub fn test1() {
     let (ipc_arg1, ipc_arg2) = Intra::arguments_for_both_ends();
 
     let j = std::thread::spawn(move || {
-        port1.initialize(ipc_arg1, true);
+        port1.initialize(RtoConfig::default_setup(), ipc_arg1, true);
         port1
     });
-    port2.initialize(ipc_arg2, true);
+    port2.initialize(RtoConfig::default_setup(), ipc_arg2, true);
     let mut port1 = j.join().unwrap();
 
     let zero_to_n: Vec<usize> = (0..n as usize).collect();
