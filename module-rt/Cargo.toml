@@ -5,7 +5,7 @@ authors = ["CodeChain Team <hi@codechain.io>"]
 edition = "2018"
 
 [dependencies]
-remote-trait-object = { version = "0.2.0", git = "https://github.com/CodeChain-io/remote-trait-object.git" }
+remote-trait-object = { version = "0.2.0" }
 foundry-process-sandbox = { git = "https://github.com/CodeChain-io/foundry-sandbox" }
 parking_lot = "0.11.0"
 serde = { version = "1.0", features = ["derive"] }
