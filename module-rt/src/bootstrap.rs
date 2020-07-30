@@ -20,13 +20,14 @@ use crate::port::ModulePort;
 use crossbeam::channel;
 use fproc_sndbx::ipc::Ipc;
 use parking_lot::{Mutex, RwLock};
-use remote_trait_object::Config as RtoConfig;
-use remote_trait_object::{Dispatch, Service, ServiceRef};
+use remote_trait_object::raw_exchange::Skeleton;
+use remote_trait_object::{Config as RtoConfig, Service, ServiceRef, ServiceToExport};
 use std::collections::HashMap;
 use std::sync::Arc;
+use threadpool::ThreadPool;
 
 pub struct ExportingServicePool {
-    pool: Vec<Option<Arc<dyn Dispatch>>>,
+    pool: Vec<Option<Skeleton>>,
 }
 
 impl ExportingServicePool {
@@ -40,7 +41,7 @@ impl ExportingServicePool {
         self.pool = ctors.iter().map(|(method, arg)| Some(module.prepare_service_to_export(method, arg))).collect();
     }
 
-    pub fn export(&mut self, index: usize) -> Arc<dyn Dispatch> {
+    pub fn export(&mut self, index: usize) -> Skeleton {
         self.pool[index].take().unwrap()
     }
 
@@ -58,6 +59,7 @@ struct ModuleContext<T: UserModule> {
     user_context: Option<Arc<Mutex<T>>>,
     exporting_service_pool: Arc<Mutex<ExportingServicePool>>,
     ports: HashMap<String, Arc<RwLock<ModulePort<T>>>>,
+    thread_pool: Arc<Mutex<ThreadPool>>,
     shutdown_signal: channel::Sender<()>,
 }
 
@@ -75,11 +77,12 @@ impl<T: UserModule + 'static> FoundryModule for ModuleContext<T> {
         let port = Arc::new(RwLock::new(ModulePort::new(
             name.to_string(),
             Arc::downgrade(self.user_context.as_ref().unwrap()),
+            Arc::clone(&self.thread_pool),
             Arc::clone(&self.exporting_service_pool),
         )));
         let port_ = Arc::clone(&port);
         assert!(self.ports.insert(name.to_owned(), port).is_none());
-        ServiceRef::export(port_ as Arc<RwLock<dyn Port>>)
+        ServiceRef::create_export(port_ as Arc<RwLock<dyn Port>>)
     }
 
     fn debug(&mut self, arg: &[u8]) -> Vec<u8> {
@@ -110,6 +113,8 @@ pub fn start<I: Ipc + 'static, T: UserModule + 'static>(args: Vec<String>) {
         user_context: None,
         exporting_service_pool: Arc::new(Mutex::new(ExportingServicePool::new())),
         ports: HashMap::new(),
+        // TODO: decide thread pool size from the configuration
+        thread_pool: Arc::new(Mutex::new(ThreadPool::new(16))),
         shutdown_signal,
     }) as Box<dyn FoundryModule>;
 
@@ -117,7 +122,11 @@ pub fn start<I: Ipc + 'static, T: UserModule + 'static>(args: Vec<String>) {
     // no need to take it from the coordinator
     let config = RtoConfig::default_setup();
     let (transport_send, transport_recv) = executee.ipc.take().unwrap().split();
-    let (_ctx, _): (_, Box<dyn remote_trait_object::NullService>) =
-        remote_trait_object::Context::with_initial_service(config, transport_send, transport_recv, module);
+    let _ctx = remote_trait_object::Context::with_initial_service_export(
+        config,
+        transport_send,
+        transport_recv,
+        ServiceToExport::new(module),
+    );
     shutdown_wait.recv().unwrap();
 }

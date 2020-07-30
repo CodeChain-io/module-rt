@@ -17,13 +17,12 @@
 extern crate foundry_module_rt as fmoudle_rt;
 extern crate foundry_process_sandbox as fproc_sndbx;
 
-use fmoudle_rt::coordinator_interface::Port;
+use fmoudle_rt::coordinator_interface::{FoundryModule, PartialRtoConfig, Port};
 use fmoudle_rt::UserModule;
 use fproc_sndbx::execution::executor::{add_function_pool, execute, Context as ExecutorContext, PlainThread};
 use fproc_sndbx::ipc::{generate_random_name, intra::Intra, Ipc};
-use remote_trait_object::{
-    service, Config as RtoConfig, Context as RtoContext, Dispatch, HandleToExchange, Service, ToDispatcher,
-};
+use remote_trait_object::raw_exchange::{import_service_from_handle, HandleToExchange, Skeleton};
+use remote_trait_object::{service, Config as RtoConfig, Context as RtoContext, Service, ServiceToImport};
 use std::sync::Arc;
 
 #[service]
@@ -64,14 +63,13 @@ impl UserModule for ModuleA {
         }
     }
 
-    fn prepare_service_to_export(&mut self, ctor_name: &str, ctor_arg: &[u8]) -> Arc<dyn Dispatch> {
+    fn prepare_service_to_export(&mut self, ctor_name: &str, ctor_arg: &[u8]) -> Skeleton {
         assert_eq!(ctor_name, "Constructor");
         let value: i32 = serde_cbor::from_slice(ctor_arg).unwrap();
-        (Box::new(SimpleHello {
+        Skeleton::new(Box::new(SimpleHello {
             value,
             greeting: self.my_greeting.clone(),
         }) as Box<dyn Hello>)
-            .to_dispatcher()
     }
 
     fn import_service(
@@ -81,7 +79,7 @@ impl UserModule for ModuleA {
         name: &str,
         handle: HandleToExchange,
     ) {
-        self.hello_list.push((remote_trait_object::import_service(rto_context, handle), name.parse().unwrap()))
+        self.hello_list.push((import_service_from_handle(rto_context, handle), name.parse().unwrap()))
     }
 
     fn debug(&mut self, _arg: &[u8]) -> Vec<u8> {
@@ -118,13 +116,9 @@ fn create_module(
 
     let (transport_send, transport_recv) = ctx.ipc.take().unwrap().split();
     let config = RtoConfig::default_setup();
-    let (rto_context, mut module): (_, Box<dyn fmoudle_rt::coordinator_interface::FoundryModule>) =
-        remote_trait_object::Context::with_initial_service(
-            config,
-            transport_send,
-            transport_recv,
-            remote_trait_object::create_null_service(),
-        );
+    let (rto_context, module): (_, ServiceToImport<dyn FoundryModule>) =
+        remote_trait_object::Context::with_initial_service_import(config, transport_send, transport_recv);
+    let mut module: Box<dyn FoundryModule> = module.into_remote();
 
     module.initialize(init, &exports);
     (ctx, rto_context, module)
@@ -147,16 +141,16 @@ pub fn test1() {
     let (_process2, rto_context2, mut module2) =
         create_module(executor_2, n, &serde_cbor::to_vec(&("Konnichiwa", "Annyeong")).unwrap());
 
-    let mut port1: Box<dyn Port> = module1.create_port("").import();
-    let mut port2: Box<dyn Port> = module2.create_port("").import();
+    let mut port1: Box<dyn Port> = module1.create_port("").unwrap_import().into_remote();
+    let mut port2: Box<dyn Port> = module2.create_port("").unwrap_import().into_remote();
 
     let (ipc_arg1, ipc_arg2) = Intra::arguments_for_both_ends();
 
     let j = std::thread::spawn(move || {
-        port1.initialize(RtoConfig::default_setup(), ipc_arg1, true);
+        port1.initialize(PartialRtoConfig::from_rto_config(RtoConfig::default_setup()), ipc_arg1, true);
         port1
     });
-    port2.initialize(RtoConfig::default_setup(), ipc_arg2, true);
+    port2.initialize(PartialRtoConfig::from_rto_config(RtoConfig::default_setup()), ipc_arg2, true);
     let mut port1 = j.join().unwrap();
 
     let zero_to_n: Vec<usize> = (0..n as usize).collect();

@@ -14,8 +14,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-use remote_trait_object::{Context as RtoContext, Dispatch, HandleToExchange};
-use std::sync::Arc;
+use remote_trait_object::raw_exchange::{HandleToExchange, Skeleton};
+use remote_trait_object::Context as RtoContext;
 
 /// A trait that represents set of methods that the user must implement to construct a
 /// a working foundry module.
@@ -26,7 +26,7 @@ use std::sync::Arc;
 /// [`start`]: ../fn.start.html
 pub trait UserModule: Send {
     fn new(arg: &[u8]) -> Self;
-    fn prepare_service_to_export(&mut self, ctor_name: &str, ctor_arg: &[u8]) -> Arc<dyn Dispatch>;
+    fn prepare_service_to_export(&mut self, ctor_name: &str, ctor_arg: &[u8]) -> Skeleton;
     fn import_service(&mut self, rto_context: &RtoContext, exporter_module: &str, name: &str, handle: HandleToExchange);
     fn debug(&mut self, arg: &[u8]) -> Vec<u8>;
 }

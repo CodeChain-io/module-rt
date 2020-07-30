@@ -5,10 +5,11 @@ authors = ["CodeChain Team <hi@codechain.io>"]
 edition = "2018"
 
 [dependencies]
-remote-trait-object = { version = "0.2.0" }
-foundry-process-sandbox = { git = "https://github.com/CodeChain-io/foundry-sandbox" }
+remote-trait-object = "=0.3.0"
+foundry-process-sandbox = { version = "0.1.0", git = "https://github.com/CodeChain-io/foundry-sandbox", tag = "v0.1.0" }
 parking_lot = "0.11.0"
 serde = { version = "1.0", features = ["derive"] }
 serde_cbor = "0.11.1"
 linkme = "0.2.1"
 crossbeam = "0.7"
+threadpool = "1.8.1"
