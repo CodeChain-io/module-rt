@@ -25,7 +25,27 @@
 //! [`FoundryModule`]: ./trait.FoundryModule.html
 //! [`Port`]: ./trait.Port.html
 
+use raw_exchange::HandleToExchange;
 use remote_trait_object::*;
+use serde::{Deserialize, Serialize};
+
+/// Same as `remote_trait_object::Config` except the thread pool.
+#[derive(Debug, Serialize, Deserialize)]
+pub struct PartialRtoConfig {
+    pub name: String,
+    pub call_slots: usize,
+    pub call_timeout: std::time::Duration,
+}
+
+impl PartialRtoConfig {
+    pub fn from_rto_config(config: Config) -> Self {
+        Self {
+            name: config.name,
+            call_slots: config.call_slots,
+            call_timeout: config.call_timeout,
+        }
+    }
+}
 
 /// A service trait that represents a module that the Foundry host will communicate through.
 #[service]
@@ -46,7 +66,7 @@ pub trait FoundryModule: Service {
 /// for the importer to cast it as he wants, we have this special interface.
 #[service]
 pub trait Port: Service {
-    fn initialize(&mut self, rto_config: Config, ipc_arg: Vec<u8>, intra: bool);
+    fn initialize(&mut self, rto_config: PartialRtoConfig, ipc_arg: Vec<u8>, intra: bool);
     fn export(&mut self, ids: &[usize]) -> Vec<HandleToExchange>;
     fn import(&mut self, slots: &[(String, HandleToExchange)]);
 }

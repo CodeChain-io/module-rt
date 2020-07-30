@@ -15,17 +15,20 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 use crate::bootstrap::ExportingServicePool;
-use crate::coordinator_interface::Port;
+use crate::coordinator_interface::{PartialRtoConfig, Port};
 use crate::module::UserModule;
 use fproc_sndbx::ipc::{intra::Intra, unix_socket::DomainSocket, Ipc};
 use parking_lot::Mutex;
-use remote_trait_object::{Config as RtoConfig, Context as RtoContext, HandleToExchange, Service};
+use remote_trait_object::raw_exchange::{export_service_into_handle, HandleToExchange};
+use remote_trait_object::{Config as RtoConfig, Context as RtoContext, Service};
 use std::sync::{Arc, Weak};
+use threadpool::ThreadPool;
 
 pub struct ModulePort<T: UserModule> {
     connected_module_name: String,
     rto_context: Option<RtoContext>,
     user_context: Weak<Mutex<T>>,
+    thread_pool: Arc<Mutex<ThreadPool>>,
     exporting_service_pool: Arc<Mutex<ExportingServicePool>>,
 }
 
@@ -33,12 +36,14 @@ impl<T: UserModule> ModulePort<T> {
     pub fn new(
         connected_module_name: String,
         user_context: Weak<Mutex<T>>,
+        thread_pool: Arc<Mutex<ThreadPool>>,
         exporting_service_pool: Arc<Mutex<ExportingServicePool>>,
     ) -> Self {
         Self {
             connected_module_name,
             rto_context: None,
             user_context,
+            thread_pool,
             exporting_service_pool,
         }
     }
@@ -53,8 +58,15 @@ impl<T: UserModule> ModulePort<T> {
 impl<T: UserModule> Service for ModulePort<T> {}
 
 impl<T: UserModule> Port for ModulePort<T> {
-    fn initialize(&mut self, rto_config: RtoConfig, ipc_arg: Vec<u8>, intra: bool) {
+    fn initialize(&mut self, rto_config: PartialRtoConfig, ipc_arg: Vec<u8>, intra: bool) {
         assert!(self.rto_context.is_none(), "Port must be initialized only once");
+
+        let rto_config = RtoConfig {
+            name: rto_config.name,
+            call_slots: rto_config.call_slots,
+            call_timeout: rto_config.call_timeout,
+            thread_pool: Arc::clone(&self.thread_pool),
+        };
         let rto_context = if intra {
             let (ipc_send, ipc_recv) = Intra::new(ipc_arg).split();
             RtoContext::new(rto_config, ipc_send, ipc_recv)
@@ -66,8 +78,10 @@ impl<T: UserModule> Port for ModulePort<T> {
     }
 
     fn export(&mut self, ids: &[usize]) -> Vec<HandleToExchange> {
-        let port = self.rto_context.as_ref().unwrap().get_port().upgrade().unwrap();
-        ids.iter().map(|&id| port.register(self.exporting_service_pool.lock().export(id))).collect()
+        let rto_context = self.rto_context.as_ref().unwrap();
+        ids.iter()
+            .map(|&id| export_service_into_handle(rto_context, self.exporting_service_pool.lock().export(id)))
+            .collect()
     }
 
     fn import(&mut self, slots: &[(String, HandleToExchange)]) {
