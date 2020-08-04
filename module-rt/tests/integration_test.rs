@@ -91,17 +91,6 @@ impl UserModule for ModuleA {
     }
 }
 
-#[service]
-pub trait SandboxForModule: remote_trait_object::Service {
-    fn ping(&self);
-}
-
-struct DummyPong;
-impl remote_trait_object::Service for DummyPong {}
-impl SandboxForModule for DummyPong {
-    fn ping(&self) {}
-}
-
 fn execute_module<M: UserModule + 'static>(args: Vec<String>) {
     fmoudle_rt::start::<Intra, M>(args);
 }
