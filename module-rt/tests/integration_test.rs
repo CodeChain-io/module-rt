@@ -114,7 +114,7 @@ fn create_module(
 }
 
 #[test]
-pub fn test1() {
+fn pair() {
     let name_1 = generate_random_name();
     add_function_pool(name_1.clone(), Arc::new(execute_module::<ModuleA>));
     let name_2 = generate_random_name();
