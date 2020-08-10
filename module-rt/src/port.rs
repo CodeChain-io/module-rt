@@ -65,6 +65,7 @@ impl<T: UserModule> Port for ModulePort<T> {
             name: rto_config.name,
             call_slots: rto_config.call_slots,
             call_timeout: rto_config.call_timeout,
+            maximum_services_num: rto_config.maximum_services_num,
             thread_pool: Arc::clone(&self.thread_pool),
         };
         let rto_context = if intra {

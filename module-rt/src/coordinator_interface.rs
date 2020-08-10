@@ -34,7 +34,8 @@ use serde::{Deserialize, Serialize};
 pub struct PartialRtoConfig {
     pub name: String,
     pub call_slots: usize,
-    pub call_timeout: std::time::Duration,
+    pub call_timeout: Option<std::time::Duration>,
+    pub maximum_services_num: usize,
 }
 
 impl PartialRtoConfig {
@@ -43,6 +44,7 @@ impl PartialRtoConfig {
             name: config.name,
             call_slots: config.call_slots,
             call_timeout: config.call_timeout,
+            maximum_services_num: config.maximum_services_num,
         }
     }
 }
