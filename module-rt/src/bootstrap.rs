@@ -42,16 +42,7 @@ impl ExportingServicePool {
     }
 
     pub fn export(&mut self, index: usize) -> Skeleton {
-        self.pool[index].take().unwrap()
-    }
-
-    pub fn is_empty(&self) -> bool {
-        for p in &self.pool {
-            if p.is_some() {
-                return false
-            }
-        }
-        true
+        self.pool[index].as_ref().unwrap().clone()
     }
 
     pub fn clear(&mut self) {
@@ -102,7 +93,6 @@ impl<T: UserModule + 'static> FoundryModule for ModuleContext<T> {
     }
 
     fn shutdown(&mut self) {
-        assert!(self.exporting_service_pool.lock().is_empty());
         // Important: We have to disable GC for **ALL** ports first, and then clear one by one.
         for port in self.ports.values() {
             port.write().get_rto_context().disable_garbage_collection();

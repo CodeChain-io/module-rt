@@ -158,7 +158,7 @@ fn create_module(mut exe: ExecutorContext<Intra, PlainThread>, exports: Vec<(Str
     }
 }
 
-fn link(modules: &[Module]) {
+fn link(modules: &[Module], single_export: bool) {
     let n = modules.len();
     for i in 0..n {
         for j in 0..n {
@@ -181,13 +181,17 @@ fn link(modules: &[Module]) {
             port2.initialize(PartialRtoConfig::from_rto_config(RtoConfig::default_setup()), ipc_arg2, true);
             let mut port1 = join.join().unwrap();
 
-            let handles_1_to_2 = port1.export(&[if j > i {
+            let handles_1_to_2 = port1.export(&[if single_export {
+                0
+            } else if j > i {
                 // We exported n - 1 services, not n, skipping the index toward itself.
                 j - 1
             } else {
                 j
             }]);
-            let handles_2_to_1 = port2.export(&[if i > j {
+            let handles_2_to_1 = port2.export(&[if single_export {
+                0
+            } else if i > j {
                 // ditto
                 i - 1
             } else {
@@ -224,7 +228,48 @@ fn multiple() {
 
     // link and bootstrap
 
-    link(&modules);
+    link(&modules, false);
+
+    // run debug
+    let mut joins = Vec::new();
+    for module in &modules {
+        let module = Arc::clone(&module.module);
+        joins.push(std::thread::spawn(move || {
+            module.write().debug(&[]);
+        }))
+    }
+
+    for join in joins.into_iter() {
+        join.join().unwrap();
+    }
+
+    for module in modules.into_iter() {
+        module.module.write().shutdown();
+        module.rto_ctx.disable_garbage_collection();
+    }
+}
+
+#[test]
+fn multiple_single_shared_export() {
+    let mut module_names = Vec::new();
+    let n = 10;
+    for _ in 0..n {
+        let name = generate_random_name();
+        add_function_pool(name.clone(), Arc::new(execute_module::<ModuleA>));
+        module_names.push(name);
+    }
+
+    let mut modules = Vec::new();
+    for name in module_names {
+        let executor = execute::<Intra, PlainThread>(&name).unwrap();
+        // we use n-1 since we don't prepare a service for its own.
+        let exports = vec![("".to_owned(), vec![])];
+        modules.push(create_module(executor, exports));
+    }
+
+    // link and bootstrap
+
+    link(&modules, true);
 
     // run debug
     let mut joins = Vec::new();
