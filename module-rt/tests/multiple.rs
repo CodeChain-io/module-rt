@@ -137,41 +137,29 @@ impl UserModule for ModuleA {
 fn execute_module<M: UserModule + 'static>(args: Vec<String>) {
     fmoudle_rt::start::<Intra, M>(args);
 }
+struct Module {
+    module: Arc<RwLock<dyn fmoudle_rt::coordinator_interface::FoundryModule>>,
+    rto_ctx: RtoContext,
+    _exe: ExecutorContext<Intra, PlainThread>,
+}
 
-fn create_module(
-    mut ctx: ExecutorContext<Intra, PlainThread>,
-    n: usize,
-) -> (ExecutorContext<Intra, PlainThread>, RtoContext, Arc<RwLock<dyn fmoudle_rt::coordinator_interface::FoundryModule>>)
-{
-    // we use n-1 since we don't prepare a service for its own.
-    let exports: Vec<(String, Vec<u8>)> = (0..n - 1).map(|_| ("".to_owned(), vec![])).collect();
-    let (transport_send, transport_recv) = ctx.ipc.take().unwrap().split();
+fn create_module(mut exe: ExecutorContext<Intra, PlainThread>, exports: Vec<(String, Vec<u8>)>) -> Module {
+    let (transport_send, transport_recv) = exe.ipc.take().unwrap().split();
     let config = RtoConfig::default_setup();
-    let (rto_context, module): (_, ServiceToImport<dyn FoundryModule>) =
+    let (rto_ctx, module): (_, ServiceToImport<dyn FoundryModule>) =
         remote_trait_object::Context::with_initial_service_import(config, transport_send, transport_recv);
     let module: Arc<RwLock<dyn FoundryModule>> = module.into_proxy();
 
     module.write().initialize(&[], &exports);
-    (ctx, rto_context, module)
+    Module {
+        module,
+        _exe: exe,
+        rto_ctx,
+    }
 }
 
-#[test]
-fn multiple() {
-    let mut module_names = Vec::new();
-    let n = 10;
-    for _ in 0..n {
-        let name = generate_random_name();
-        add_function_pool(name.clone(), Arc::new(execute_module::<ModuleA>));
-        module_names.push(name);
-    }
-
-    let mut modules = Vec::new();
-    for name in module_names {
-        let executor = execute::<Intra, PlainThread>(&name).unwrap();
-        modules.push(create_module(executor, n));
-    }
-
-    // link and bootstrap
+fn link(modules: &[Module]) {
+    let n = modules.len();
     for i in 0..n {
         for j in 0..n {
             if i >= j {
@@ -180,8 +168,10 @@ fn multiple() {
 
             let port_name = generate_random_name();
 
-            let mut port1: Box<dyn Port> = modules[i].2.write().create_port(&port_name).unwrap_import().into_proxy();
-            let mut port2: Box<dyn Port> = modules[j].2.write().create_port(&port_name).unwrap_import().into_proxy();
+            let mut port1: Box<dyn Port> =
+                modules[i].module.write().create_port(&port_name).unwrap_import().into_proxy();
+            let mut port2: Box<dyn Port> =
+                modules[j].module.write().create_port(&port_name).unwrap_import().into_proxy();
             let (ipc_arg1, ipc_arg2) = Intra::arguments_for_both_ends();
 
             let join = std::thread::spawn(move || {
@@ -209,14 +199,37 @@ fn multiple() {
         }
     }
 
-    for (_, _, module) in &modules {
-        module.write().finish_bootstrap();
+    for module in modules {
+        module.module.write().finish_bootstrap();
     }
+}
+
+#[test]
+fn multiple() {
+    let mut module_names = Vec::new();
+    let n = 10;
+    for _ in 0..n {
+        let name = generate_random_name();
+        add_function_pool(name.clone(), Arc::new(execute_module::<ModuleA>));
+        module_names.push(name);
+    }
+
+    let mut modules = Vec::new();
+    for name in module_names {
+        let executor = execute::<Intra, PlainThread>(&name).unwrap();
+        // we use n-1 since we don't prepare a service for its own.
+        let exports: Vec<(String, Vec<u8>)> = (0..n - 1).map(|_| ("".to_owned(), vec![])).collect();
+        modules.push(create_module(executor, exports));
+    }
+
+    // link and bootstrap
+
+    link(&modules);
 
     // run debug
     let mut joins = Vec::new();
-    for (_, _, module) in &modules {
-        let module = Arc::clone(&module);
+    for module in &modules {
+        let module = Arc::clone(&module.module);
         joins.push(std::thread::spawn(move || {
             module.write().debug(&[]);
         }))
@@ -226,8 +239,8 @@ fn multiple() {
         join.join().unwrap();
     }
 
-    for (_exe_ctx, rto_ctx, module) in modules.into_iter() {
-        module.write().shutdown();
-        rto_ctx.disable_garbage_collection();
+    for module in modules.into_iter() {
+        module.module.write().shutdown();
+        module.rto_ctx.disable_garbage_collection();
     }
 }
