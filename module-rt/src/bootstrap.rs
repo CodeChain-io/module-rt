@@ -103,8 +103,12 @@ impl<T: UserModule + 'static> FoundryModule for ModuleContext<T> {
 
     fn shutdown(&mut self) {
         assert!(self.exporting_service_pool.lock().is_empty());
+        // Important: We have to disable GC for **ALL** ports first, and then clear one by one.
         for port in self.ports.values() {
-            port.write().shutdown();
+            port.write().get_rto_context().disable_garbage_collection();
+        }
+        for port in self.ports.values() {
+            port.write().get_rto_context().clear_service_registry();
         }
         self.user_context.take().unwrap();
         self.ports.clear();
