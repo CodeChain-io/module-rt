@@ -159,6 +159,9 @@ fn pair() {
     port1.import(&handles_2_to_1);
     port2.import(&handles_1_to_2);
 
+    module1.finish_bootstrap();
+    module2.finish_bootstrap();
+
     module1.debug(&[]);
     module2.debug(&[]);
 

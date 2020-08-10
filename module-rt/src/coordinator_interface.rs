@@ -54,6 +54,7 @@ impl PartialRtoConfig {
 pub trait FoundryModule: Service {
     fn initialize(&mut self, arg: &[u8], exports: &[(String, Vec<u8>)]);
     fn create_port(&mut self, name: &str) -> ServiceRef<dyn Port>;
+    fn finish_bootstrap(&mut self);
     fn debug(&mut self, arg: &[u8]) -> Vec<u8>;
     fn shutdown(&mut self);
 }
