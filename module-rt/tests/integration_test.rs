@@ -118,7 +118,7 @@ fn create_module(
     let config = RtoConfig::default_setup();
     let (rto_context, module): (_, ServiceToImport<dyn FoundryModule>) =
         remote_trait_object::Context::with_initial_service_import(config, transport_send, transport_recv);
-    let mut module: Box<dyn FoundryModule> = module.into_remote();
+    let mut module: Box<dyn FoundryModule> = module.into_proxy();
 
     module.initialize(init, &exports);
     (ctx, rto_context, module)
@@ -141,8 +141,8 @@ pub fn test1() {
     let (_process2, rto_context2, mut module2) =
         create_module(executor_2, n, &serde_cbor::to_vec(&("Konnichiwa", "Annyeong")).unwrap());
 
-    let mut port1: Box<dyn Port> = module1.create_port("").unwrap_import().into_remote();
-    let mut port2: Box<dyn Port> = module2.create_port("").unwrap_import().into_remote();
+    let mut port1: Box<dyn Port> = module1.create_port("").unwrap_import().into_proxy();
+    let mut port2: Box<dyn Port> = module2.create_port("").unwrap_import().into_proxy();
 
     let (ipc_arg1, ipc_arg2) = Intra::arguments_for_both_ends();
 
