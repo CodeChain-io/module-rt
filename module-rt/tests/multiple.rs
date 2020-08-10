@@ -209,6 +209,10 @@ fn multiple() {
         }
     }
 
+    for (_, _, module) in &modules {
+        module.write().finish_bootstrap();
+    }
+
     // run debug
     let mut joins = Vec::new();
     for (_, _, module) in &modules {

@@ -53,6 +53,10 @@ impl ExportingServicePool {
         }
         true
     }
+
+    pub fn clear(&mut self) {
+        self.pool.clear();
+    }
 }
 
 struct ModuleContext<T: UserModule> {
@@ -61,6 +65,7 @@ struct ModuleContext<T: UserModule> {
     ports: HashMap<String, Arc<RwLock<ModulePort<T>>>>,
     thread_pool: Arc<Mutex<ThreadPool>>,
     shutdown_signal: channel::Sender<()>,
+    bootstrap_finished: bool,
 }
 
 impl<T: UserModule> Service for ModuleContext<T> {}
@@ -74,6 +79,7 @@ impl<T: UserModule + 'static> FoundryModule for ModuleContext<T> {
     }
 
     fn create_port(&mut self, name: &str) -> ServiceRef<dyn Port> {
+        assert!(!self.bootstrap_finished);
         let port = Arc::new(RwLock::new(ModulePort::new(
             name.to_string(),
             Arc::downgrade(self.user_context.as_ref().unwrap()),
@@ -83,6 +89,12 @@ impl<T: UserModule + 'static> FoundryModule for ModuleContext<T> {
         let port_ = Arc::clone(&port);
         assert!(self.ports.insert(name.to_owned(), port).is_none());
         ServiceRef::create_export(port_ as Arc<RwLock<dyn Port>>)
+    }
+
+    fn finish_bootstrap(&mut self) {
+        self.exporting_service_pool.lock().clear();
+        assert!(!self.bootstrap_finished);
+        self.bootstrap_finished = true;
     }
 
     fn debug(&mut self, arg: &[u8]) -> Vec<u8> {
@@ -116,6 +128,7 @@ pub fn start<I: Ipc + 'static, T: UserModule + 'static>(args: Vec<String>) {
         // TODO: decide thread pool size from the configuration
         thread_pool: Arc::new(Mutex::new(ThreadPool::new(16))),
         shutdown_signal,
+        bootstrap_finished: false,
     }) as Box<dyn FoundryModule>;
 
     // rto configuration of the module itself (not each port) is not that important;
