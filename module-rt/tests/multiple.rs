@@ -97,13 +97,7 @@ impl UserModule for ModuleA {
         }) as Box<dyn PizzaStore>)
     }
 
-    fn import_service(
-        &mut self,
-        rto_context: &RtoContext,
-        _exporter_module: &str,
-        _name: &str,
-        handle: HandleToExchange,
-    ) {
+    fn import_service(&mut self, rto_context: &RtoContext, _name: &str, handle: HandleToExchange) {
         self.pizza_stores.push(import_service_from_handle(rto_context, handle));
     }
 
