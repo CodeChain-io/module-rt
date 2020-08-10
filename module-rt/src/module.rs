@@ -27,6 +27,6 @@ use remote_trait_object::Context as RtoContext;
 pub trait UserModule: Send {
     fn new(arg: &[u8]) -> Self;
     fn prepare_service_to_export(&mut self, ctor_name: &str, ctor_arg: &[u8]) -> Skeleton;
-    fn import_service(&mut self, rto_context: &RtoContext, exporter_module: &str, name: &str, handle: HandleToExchange);
+    fn import_service(&mut self, rto_context: &RtoContext, name: &str, handle: HandleToExchange);
     fn debug(&mut self, arg: &[u8]) -> Vec<u8>;
 }

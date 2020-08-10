@@ -25,7 +25,6 @@ use std::sync::{Arc, Weak};
 use threadpool::ThreadPool;
 
 pub struct ModulePort<T: UserModule> {
-    connected_module_name: String,
     rto_context: Option<RtoContext>,
     user_context: Weak<Mutex<T>>,
     thread_pool: Arc<Mutex<ThreadPool>>,
@@ -34,13 +33,11 @@ pub struct ModulePort<T: UserModule> {
 
 impl<T: UserModule> ModulePort<T> {
     pub fn new(
-        connected_module_name: String,
         user_context: Weak<Mutex<T>>,
         thread_pool: Arc<Mutex<ThreadPool>>,
         exporting_service_pool: Arc<Mutex<ExportingServicePool>>,
     ) -> Self {
         Self {
-            connected_module_name,
             rto_context: None,
             user_context,
             thread_pool,
@@ -87,7 +84,6 @@ impl<T: UserModule> Port for ModulePort<T> {
         for (name, handle) in slots {
             self.user_context.upgrade().unwrap().lock().import_service(
                 self.rto_context.as_ref().unwrap(),
-                &self.connected_module_name,
                 name,
                 *handle,
             )

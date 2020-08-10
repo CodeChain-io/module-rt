@@ -72,7 +72,6 @@ impl<T: UserModule + 'static> FoundryModule for ModuleContext<T> {
     fn create_port(&mut self, name: &str) -> ServiceRef<dyn Port> {
         assert!(!self.bootstrap_finished);
         let port = Arc::new(RwLock::new(ModulePort::new(
-            name.to_string(),
             Arc::downgrade(self.user_context.as_ref().unwrap()),
             Arc::clone(&self.thread_pool),
             Arc::clone(&self.exporting_service_pool),
