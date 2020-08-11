@@ -1,6 +1,6 @@
 [package]
 name = "foundry-module-rt"
-version = "0.1.1"
+version = "0.2.0"
 authors = ["CodeChain Team <hi@codechain.io>"]
 license = "GPL-3.0"
 edition = "2018"
