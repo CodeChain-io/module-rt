@@ -202,6 +202,7 @@ fn link(modules: &[Module], single_export: bool) {
     }
 }
 
+#[allow(clippy::same_item_push)]
 #[test]
 fn multiple() {
     let mut module_names = Vec::new();
@@ -243,6 +244,7 @@ fn multiple() {
     }
 }
 
+#[allow(clippy::same_item_push)]
 #[test]
 fn multiple_single_shared_export() {
     let mut module_names = Vec::new();
