@@ -119,7 +119,7 @@ pub fn start<I: Ipc + 'static, T: UserModule + 'static>(args: Vec<String>) {
         exporting_service_pool: Arc::new(Mutex::new(ExportingServicePool::new())),
         ports: HashMap::new(),
         // TODO: decide thread pool size from the configuration
-        thread_pool: Arc::new(Mutex::new(ThreadPool::new(16))),
+        thread_pool: Arc::new(Mutex::new(ThreadPool::with_name("module_worker".to_owned(), 16))),
         shutdown_signal,
         bootstrap_finished: false,
     }) as Box<dyn FoundryModule>;
