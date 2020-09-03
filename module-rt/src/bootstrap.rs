@@ -55,8 +55,10 @@ struct ModuleContext<T: UserModule> {
     exporting_service_pool: Arc<Mutex<ExportingServicePool>>,
     ports: HashMap<String, Arc<RwLock<ModulePort<T>>>>,
     thread_pool: Arc<Mutex<ThreadPool>>,
-    shutdown_signal: channel::Sender<()>,
     bootstrap_finished: bool,
+
+    /// This is only for the case created by [`start()`].
+    shutdown_signal: channel::Sender<()>,
 }
 
 impl<T: UserModule> Service for ModuleContext<T> {}
@@ -102,6 +104,30 @@ impl<T: UserModule + 'static> FoundryModule for ModuleContext<T> {
         self.user_context.take().unwrap();
         self.ports.clear();
         self.shutdown_signal.send(()).unwrap();
+    }
+}
+
+/// A special funciton to construct an actual instance of FoundryModule, without RTO connection.
+///
+/// This is useful when you want to realize linkability without any execution or RTO connection.
+/// If you're writing a plain module, this is not for you because your job is writing an executable that runs [`FoundryModule`],
+/// not obtaining the actual instance of [`FoundryModule`].
+pub fn create_foundry_module<T: UserModule + 'static>(
+    mut module: T,
+    exports: &[(String, Vec<u8>)],
+) -> impl FoundryModule {
+    let (shutdown_signal, _) = channel::bounded(1);
+    let exporting_service_pool = Arc::new(Mutex::new(ExportingServicePool::new()));
+    exporting_service_pool.lock().load(&exports, &mut module);
+
+    ModuleContext::<T> {
+        user_context: Some(Arc::new(Mutex::new(module))),
+        exporting_service_pool,
+        ports: HashMap::new(),
+        // TODO: decide thread pool size from the configuration
+        thread_pool: Arc::new(Mutex::new(ThreadPool::new(16))),
+        shutdown_signal,
+        bootstrap_finished: false,
     }
 }
 

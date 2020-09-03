@@ -21,5 +21,5 @@ pub mod coordinator_interface;
 mod module;
 mod port;
 
-pub use bootstrap::start;
+pub use bootstrap::{create_foundry_module, start};
 pub use module::UserModule;
