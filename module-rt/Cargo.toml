@@ -1,13 +1,13 @@
 [package]
 name = "foundry-module-rt"
-version = "0.2.1"
+version = "0.2.2"
 authors = ["CodeChain Team <hi@codechain.io>"]
 license = "GPL-3.0"
 edition = "2018"
 
 [dependencies]
 remote-trait-object = "0.4.0"
-foundry-process-sandbox = { version = "0.2.0", git = "https://github.com/CodeChain-io/foundry-sandbox", tag = "v0.2.0" }
+foundry-process-sandbox = { version = "0.2.1", git = "https://github.com/CodeChain-io/foundry-sandbox", tag = "v0.2.1" }
 parking_lot = "0.11.0"
 serde = { version = "1.0", features = ["derive"] }
 serde_cbor = "0.11.1"
