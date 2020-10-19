@@ -25,8 +25,30 @@ use remote_trait_object::Context as RtoContext;
 ///
 /// [`start`]: ../fn.start.html
 pub trait UserModule: Send {
+    /// Creates an instance of module from arguments.
     fn new(arg: &[u8]) -> Self;
+
+    /// Creates a service object from the constructor and arguments.
+    ///
+    /// This method will be called for every entries specified in link-desc's `export` field.
+    /// Created `Skeleton`s will be stored in a pool and will be exported to other modules in the export & import phase.
+    ///
+    /// You have to use `remote-trait-object::raw_exchange` module to convert a trait object into `Skeleton`.
     fn prepare_service_to_export(&mut self, ctor_name: &str, ctor_arg: &[u8]) -> Skeleton;
+
+    /// Imports a service from its handle.
+    ///
+    /// This method will be called for every entries specified in link-desc's `import` field, with given name.
+    /// Given `handle` could be from any of modules that this module is linked with,
+    /// and it is identified by `rto_context` that such link corresponds to.
+    ///
+    /// You have to use `remote-trait-object::raw_exchange` module to convert `HandleToExchange` into a proxy object.
+    /// It will require `rto_context` because such conversion must be done on a speicific link.
     fn import_service(&mut self, rto_context: &RtoContext, name: &str, handle: HandleToExchange);
+
+    /// A debug purpose method.
+    ///
+    /// Do whatever you want.
+    /// It can be used in Mold's sandbox implementation.
     fn debug(&mut self, arg: &[u8]) -> Vec<u8>;
 }
